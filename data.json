@@ -1,10 +1,10 @@
 {
   "Visibility": "VISIBLE",
-  "Title": "Title",
-  "Description": "Discription Message",
+  "Title": "New Updates Available!",
+  "Description": "We’ve optimized system performance and fixed issues to ensure a more stable experience",
   "MainTextButton": "Update",
   "Cancelable": "true",
-  "CancelButtonText": "Cancel",
+  "CancelButtonText": "Later",
   "DownloadLink": "www.example.com",
   "Version": "1.1"
 }
