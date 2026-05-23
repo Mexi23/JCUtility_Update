@@ -1,0 +1,1077 @@
+}
+private class CyberTask11 extends AsyncTask<String, String, String> {
+
+	AlertDialog ODialog;
+	View inflate;
+
+	ProgressBar progressbar1, progressbar2;
+
+	TextView download_mb, download_percent, download_seconds;
+	TextView process_files, process_percent, process_seconds;
+	TextView textview5;
+
+	String filename = "";
+	String result = "";
+	double size = 0;
+	double sumCount = 0;
+	long downloadStartTime = 0;
+
+	@Override
+	protected void onPreExecute() {
+		super.onPreExecute();
+
+		if (!auto.getString("auto", "").equals("auto2")) {
+
+			AlertDialog.Builder dgg = new AlertDialog.Builder(StsActivity.this);
+			ODialog = dgg.create();
+
+			inflate = getLayoutInflater().inflate(R.layout.downloading, null);
+
+			progressbar1 = inflate.findViewById(R.id.progressbar1);
+progressbar2 = inflate.findViewById(R.id.progressbar2);
+
+progressbar1.setProgressDrawable(
+	getResources().getDrawable(R.drawable.progress_download)
+);
+
+progressbar2.setProgressDrawable(
+	getResources().getDrawable(R.drawable.progress_download)
+);
+
+			download_mb = inflate.findViewById(R.id.download_mb);
+			download_percent = inflate.findViewById(R.id.download_percent);
+			download_seconds = inflate.findViewById(R.id.download_seconds);
+
+			process_files = inflate.findViewById(R.id.process_files);
+			process_percent = inflate.findViewById(R.id.process_percent);
+			process_seconds = inflate.findViewById(R.id.process_seconds);
+			textview5 = inflate.findViewById(R.id.textview5);
+
+			progressbar1.setMax(100);
+			progressbar1.setProgress(0);
+
+			progressbar2.setMax(100);
+			progressbar2.setProgress(0);
+			progressbar2.setIndeterminate(false);
+
+			download_mb.setText("0.00 MB / 0.00 MB");
+			download_percent.setText("0%");
+			download_seconds.setText("Preparing...");
+
+			textview5.setText("Downloading...");
+
+			process_files.setText("0 / 0 files processed");
+			process_percent.setText("0%");
+			process_seconds.setText("Waiting...");
+
+			ODialog.setView(inflate);
+			ODialog.setCancelable(false);
+			ODialog.show();
+
+			if (ODialog.getWindow() != null) {
+				ODialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+			}
+		}
+	}
+
+	@Override
+	protected String doInBackground(String... address) {
+
+		try {
+
+			filename = URLUtil.guessFileName(address[0], null, null);
+
+			if (auto.getString("auto", "").equals("auto2")) {
+				return address[0];
+			}
+
+			urit = Uri.parse(sp.getString("D_URI", ""));
+			path = DocumentFile.fromTreeUri(StsActivity.this, urit);
+
+			path1 = path.createFile("*/*", filename.toLowerCase());
+
+			java.net.URL url = new java.net.URL(address[0]);
+			java.net.URLConnection urlConn = url.openConnection();
+
+			if (!(urlConn instanceof java.net.HttpURLConnection)) {
+				throw new java.io.IOException("URL is not an Http URL");
+			}
+
+			java.net.HttpURLConnection httpConn = (java.net.HttpURLConnection) urlConn;
+			httpConn.setAllowUserInteraction(false);
+			httpConn.setInstanceFollowRedirects(true);
+			httpConn.setRequestMethod("GET");
+			httpConn.connect();
+
+			int resCode = httpConn.getResponseCode();
+
+			if (resCode == java.net.HttpURLConnection.HTTP_OK) {
+				size = httpConn.getContentLength();
+			}
+			else {
+				result = "There was an error";
+				return result;
+			}
+
+			java.io.InputStream in = httpConn.getInputStream();
+			OutputStream output = getContentResolver().openOutputStream(path1.getUri());
+
+			int bytesRead;
+			sumCount = 0;
+			byte[] buffer = new byte[8192];
+
+			downloadStartTime = System.currentTimeMillis();
+
+			while ((bytesRead = in.read(buffer)) != -1) {
+
+				output.write(buffer, 0, bytesRead);
+				sumCount += bytesRead;
+
+				if (size > 0) {
+
+					int percent = (int)Math.round(sumCount * 100 / size);
+
+					double currentMb = sumCount / 1024.0 / 1024.0;
+					double totalMb = size / 1024.0 / 1024.0;
+
+					long elapsed = System.currentTimeMillis() - downloadStartTime;
+					double speed = sumCount / (elapsed / 1000.0);
+
+					long secondsLeft = 0;
+
+					if (speed > 0) {
+						secondsLeft = (long)((size - sumCount) / speed);
+					}
+
+					publishProgress(
+						String.valueOf(percent),
+						String.format(java.util.Locale.US, "%.2f MB / %.2f MB", currentMb, totalMb),
+						"~" + secondsLeft + " seconds left"
+					);
+				}
+			}
+
+			output.close();
+			in.close();
+
+			result = "";
+
+		} catch (java.net.MalformedURLException e) {
+			result = e.getMessage();
+		} catch (java.io.IOException e) {
+			result = e.getMessage();
+		} catch (Exception e) {
+			result = e.toString();
+		}
+
+		return result;
+	}
+
+	@Override
+	protected void onProgressUpdate(String... values) {
+		super.onProgressUpdate(values);
+
+		int percent = Integer.parseInt(values[0]);
+
+		progressbar1.setProgress(percent);
+		download_percent.setText(percent + "%");
+		download_mb.setText(values[1]);
+		download_seconds.setText(values[2]);
+	}
+
+	@Override
+	protected void onPostExecute(String s) {
+
+		if (auto.getString("auto", "").equals("auto2")) {
+
+			if (ShizukuUtil.isShizukuInstalled(getApplicationContext()) && ShizukuUtil.isRunning()) {
+				if (ShizukuUtil.isReady()) {
+					_ShizukuAutoInject(s, FileUtil.getExternalStorageDir().concat("/Android/data/com.mobile.legends/files/dragon2017/"));
+				}
+				else {
+					if (ShizukuUtil.checkPermission(StsActivity.this, 100)) {
+
+					}
+				}
+			}
+			else {
+				SketchwareUtil.showMessage(getApplicationContext(), "Choose Other Options or Run your Shizuku!");
+				i.setClass(getApplicationContext(), PermissionActivity.class);
+				startActivity(i);
+			}
+
+			return;
+		}
+
+		if (!s.equals("")) {
+
+			if (ODialog != null) {
+				ODialog.dismiss();
+			}
+
+			SketchwareUtil.showMessage(getApplicationContext(), s);
+			return;
+		}
+
+		textview5.setText("Downloaded");
+
+		files = filename;
+
+		Decompress d = new Decompress(
+			path1,
+			path,
+			StsActivity.this,
+			ODialog,
+			progressbar2,
+			process_files,
+			process_percent,
+			process_seconds
+		);
+
+		d.execute();
+	}
+}
+
+
+private class Decompress extends AsyncTask<Void, Integer, Integer> {
+
+	DocumentFile srcZipFile;
+	DocumentFile destDir;
+	Context ctx;
+
+	AlertDialog ODialog;
+	ProgressBar progressbar2;
+
+	TextView process_files;
+	TextView process_percent;
+	TextView process_seconds;
+
+	int result = 0;
+	int totalFiles = 0;
+	int processedFiles = 0;
+	long extractStartTime = 0;
+
+	public Decompress(
+		DocumentFile srcZipFile,
+		DocumentFile destDir,
+		Context ctx,
+		AlertDialog ODialog,
+		ProgressBar progressbar2,
+		TextView process_files,
+		TextView process_percent,
+		TextView process_seconds
+	) {
+		super();
+		this.srcZipFile = srcZipFile;
+		this.destDir = destDir;
+		this.ctx = ctx;
+		this.ODialog = ODialog;
+		this.progressbar2 = progressbar2;
+		this.process_files = process_files;
+		this.process_percent = process_percent;
+		this.process_seconds = process_seconds;
+	}
+
+	@Override
+	protected void onPreExecute() {
+		super.onPreExecute();
+
+		progressbar2.setMax(100);
+		progressbar2.setProgress(0);
+		progressbar2.setIndeterminate(false);
+
+		process_files.setText("Counting files...");
+		process_percent.setText("0%");
+		process_seconds.setText("Preparing...");
+	}
+
+	@Override
+	protected Integer doInBackground(Void... params) {
+
+		try {
+
+			totalFiles = countZipFiles();
+
+			extractStartTime = System.currentTimeMillis();
+
+			ZipEntry entry;
+			InputStream inputStream = getContentResolver().openInputStream(srcZipFile.getUri());
+			BufferedInputStream bis = new BufferedInputStream(inputStream);
+			java.util.zip.ZipInputStream zipInputStream = new java.util.zip.ZipInputStream(bis);
+
+			while ((entry = zipInputStream.getNextEntry()) != null) {
+
+				DocumentFile parentDir = destDir;
+				DocumentFile childDir = null;
+
+				processedFiles++;
+				publishProgress(processedFiles);
+
+				if (entry.toString().endsWith("/")) {
+
+					String[] tempStr = entry.toString().split("/");
+
+					for (String st : tempStr) {
+
+						if (st.equals("UI")) {
+							childDir = parentDir.findFile(st.toUpperCase());
+
+							if (childDir == null) {
+								childDir = parentDir.createDirectory(st);
+							}
+
+						} else {
+
+							childDir = parentDir.findFile(st);
+
+							if (childDir == null) {
+								childDir = parentDir.createDirectory(st);
+							}
+						}
+
+						parentDir = childDir;
+					}
+				}
+				else if (entry.toString().contains("/")) {
+
+					String[] tempStr = entry.toString().split("/");
+
+					for (int i = 0; i < tempStr.length - 1; i++) {
+
+						childDir = parentDir.findFile(tempStr[i]);
+
+						if (childDir == null) {
+							childDir = parentDir.createDirectory(tempStr[i]);
+						}
+
+						parentDir = childDir;
+					}
+
+					unzipFile(entry, zipInputStream, parentDir);
+				}
+				else if (entry.toString().equals("/")) {
+
+				}
+				else {
+
+					unzipFile(entry, zipInputStream, destDir);
+				}
+			}
+
+			zipInputStream.close();
+			inputStream.close();
+
+		} catch (IOException e1) {
+
+			final String e11 = e1.toString();
+
+			runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+					SketchwareUtil.showMessage(getApplicationContext(), e11);
+				}
+			});
+		}
+
+		return result;
+	}
+
+	private int countZipFiles() {
+
+		int count = 0;
+
+		try {
+
+			InputStream inputStream = getContentResolver().openInputStream(srcZipFile.getUri());
+			BufferedInputStream bis = new BufferedInputStream(inputStream);
+			java.util.zip.ZipInputStream zipInputStream = new java.util.zip.ZipInputStream(bis);
+
+			ZipEntry entry;
+
+			while ((entry = zipInputStream.getNextEntry()) != null) {
+				count++;
+			}
+
+			zipInputStream.close();
+			inputStream.close();
+
+		} catch (Exception e) {
+
+		}
+
+		return count;
+	}
+
+	private void unzipFile(
+		ZipEntry fileEntry,
+		java.util.zip.ZipInputStream zipInputStream,
+		DocumentFile finalDir
+	) throws IOException {
+
+		if (!fileEntry.isDirectory()) {
+
+			DocumentFile tempFile = null;
+			DocumentFile df = null;
+			DocumentFile dff = finalDir;
+
+			tempFile = DocumentFile.fromSingleUri(
+				StsActivity.this,
+				Uri.parse(finalDir.getUri().toString().concat(Uri.encode("/").concat(Uri.parse(fileEntry.toString()).getLastPathSegment())))
+			);
+
+			if (tempFile.exists()) {
+
+				df = tempFile;
+
+			} else {
+
+				df = dff.createFile("*/*", Uri.parse(fileEntry.toString()).getLastPathSegment());
+			}
+
+			try {
+
+				OutputStream out = getContentResolver().openOutputStream(df.getUri());
+				BufferedOutputStream bos = new BufferedOutputStream(out);
+
+				byte[] buffer = new byte[4096];
+				int count = -1;
+
+				while ((count = zipInputStream.read(buffer)) != -1) {
+					out.write(buffer, 0, count);
+				}
+
+				out.close();
+				bos.close();
+
+			} catch (Exception e2) {
+
+				final String e22 = e2.toString();
+
+				runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						SketchwareUtil.showMessage(getApplicationContext(), e22);
+					}
+				});
+			}
+		}
+	}
+
+	@Override
+	protected void onProgressUpdate(Integer... progress) {
+		super.onProgressUpdate(progress);
+
+		int current = progress[progress.length - 1];
+		int percent = 0;
+
+		if (totalFiles > 0) {
+			percent = (int)((current * 100) / totalFiles);
+		}
+
+		progressbar2.setProgress(percent);
+		process_files.setText(current + " / " + totalFiles + " files processed");
+		process_percent.setText(percent + "%");
+
+		long elapsed = (System.currentTimeMillis() - extractStartTime) / 1000;
+		process_seconds.setText(elapsed + " seconds");
+	}
+
+	@Override
+	protected void onPostExecute(Integer result) {
+		super.onPostExecute(result);
+
+		progressbar2.setProgress(100);
+		process_percent.setText("100%");
+
+		if (ODialog != null) {
+			ODialog.dismiss();
+		}
+
+		try {
+
+			DocumentsContract.deleteDocument(
+				getApplicationContext().getContentResolver(),
+				srcZipFile.getUri()
+			);
+
+			TastyToast.makeText(
+				StsActivity.this,
+				"Download Completed!",
+				TastyToast.LENGTH_LONG,
+				TastyToast.SUCCESS
+			);
+
+		} catch (FileNotFoundException e) {
+
+			TastyToast.makeText(
+				StsActivity.this,
+				"Error",
+				TastyToast.LENGTH_LONG,
+				TastyToast.ERROR
+			);
+		}
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
+private class CyberTask11 extends AsyncTask<String, String, String> {
+
+	AlertDialog ODialog;
+	View inflate;
+
+	ProgressBar progressbar1, progressbar2;
+
+	TextView download_mb, download_percent, download_seconds;
+	TextView process_files, process_percent, process_seconds;
+	TextView textview5;
+
+	String filename = "";
+	String result = "";
+	double size = 0;
+	double sumCount = 0;
+	long downloadStartTime = 0;
+
+	@Override
+	protected void onPreExecute() {
+		super.onPreExecute();
+
+		if (!auto.getString("auto", "").equals("auto2")) {
+
+			AlertDialog.Builder dgg = new AlertDialog.Builder(MainActivity.this);
+			ODialog = dgg.create();
+
+			inflate = getLayoutInflater().inflate(R.layout.downloading, null);
+
+			progressbar1 = inflate.findViewById(R.id.progressbar1);
+progressbar2 = inflate.findViewById(R.id.progressbar2);
+
+progressbar1.setProgressDrawable(
+	getResources().getDrawable(R.drawable.progress_download)
+);
+
+progressbar2.setProgressDrawable(
+	getResources().getDrawable(R.drawable.progress_download)
+);
+
+			download_mb = inflate.findViewById(R.id.download_mb);
+			download_percent = inflate.findViewById(R.id.download_percent);
+			download_seconds = inflate.findViewById(R.id.download_seconds);
+
+			process_files = inflate.findViewById(R.id.process_files);
+			process_percent = inflate.findViewById(R.id.process_percent);
+			process_seconds = inflate.findViewById(R.id.process_seconds);
+			textview5 = inflate.findViewById(R.id.textview5);
+
+			progressbar1.setMax(100);
+			progressbar1.setProgress(0);
+
+			progressbar2.setMax(100);
+			progressbar2.setProgress(0);
+			progressbar2.setIndeterminate(false);
+
+			download_mb.setText("0.00 MB / 0.00 MB");
+			download_percent.setText("0%");
+			download_seconds.setText("Preparing...");
+
+			textview5.setText("Downloading...");
+
+			process_files.setText("0 / 0 files processed");
+			process_percent.setText("0%");
+			process_seconds.setText("Waiting...");
+
+			ODialog.setView(inflate);
+			ODialog.setCancelable(false);
+			ODialog.show();
+
+			if (ODialog.getWindow() != null) {
+				ODialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+			}
+		}
+	}
+
+	@Override
+	protected String doInBackground(String... address) {
+
+		try {
+
+			filename = URLUtil.guessFileName(address[0], null, null);
+
+			if (auto.getString("auto", "").equals("auto2")) {
+				return address[0];
+			}
+
+			urit = Uri.parse(sp.getString("D_URI", ""));
+			path = DocumentFile.fromTreeUri(MainActivity.this, urit);
+
+			path1 = path.createFile("*/*", filename.toLowerCase());
+
+			java.net.URL url = new java.net.URL(address[0]);
+			java.net.URLConnection urlConn = url.openConnection();
+
+			if (!(urlConn instanceof java.net.HttpURLConnection)) {
+				throw new java.io.IOException("URL is not an Http URL");
+			}
+
+			java.net.HttpURLConnection httpConn = (java.net.HttpURLConnection) urlConn;
+			httpConn.setAllowUserInteraction(false);
+			httpConn.setInstanceFollowRedirects(true);
+			httpConn.setRequestMethod("GET");
+			httpConn.connect();
+
+			int resCode = httpConn.getResponseCode();
+
+			if (resCode == java.net.HttpURLConnection.HTTP_OK) {
+				size = httpConn.getContentLength();
+			}
+			else {
+				result = "There was an error";
+				return result;
+			}
+
+			java.io.InputStream in = httpConn.getInputStream();
+			OutputStream output = getContentResolver().openOutputStream(path1.getUri());
+
+			int bytesRead;
+			sumCount = 0;
+			byte[] buffer = new byte[8192];
+
+			downloadStartTime = System.currentTimeMillis();
+
+			while ((bytesRead = in.read(buffer)) != -1) {
+
+				output.write(buffer, 0, bytesRead);
+				sumCount += bytesRead;
+
+				if (size > 0) {
+
+					int percent = (int)Math.round(sumCount * 100 / size);
+
+					double currentMb = sumCount / 1024.0 / 1024.0;
+					double totalMb = size / 1024.0 / 1024.0;
+
+					long elapsed = System.currentTimeMillis() - downloadStartTime;
+					double speed = sumCount / (elapsed / 1000.0);
+
+					long secondsLeft = 0;
+
+					if (speed > 0) {
+						secondsLeft = (long)((size - sumCount) / speed);
+					}
+
+					publishProgress(
+						String.valueOf(percent),
+						String.format(java.util.Locale.US, "%.2f MB / %.2f MB", currentMb, totalMb),
+						"~" + secondsLeft + " seconds left"
+					);
+				}
+			}
+
+			output.close();
+			in.close();
+
+			result = "";
+
+		} catch (java.net.MalformedURLException e) {
+			result = e.getMessage();
+		} catch (java.io.IOException e) {
+			result = e.getMessage();
+		} catch (Exception e) {
+			result = e.toString();
+		}
+
+		return result;
+	}
+
+	@Override
+	protected void onProgressUpdate(String... values) {
+		super.onProgressUpdate(values);
+
+		int percent = Integer.parseInt(values[0]);
+
+		progressbar1.setProgress(percent);
+		download_percent.setText(percent + "%");
+		download_mb.setText(values[1]);
+		download_seconds.setText(values[2]);
+	}
+
+	@Override
+	protected void onPostExecute(String s) {
+
+		if (auto.getString("auto", "").equals("auto2")) {
+
+			if (ShizukuUtil.isShizukuInstalled(getApplicationContext()) && ShizukuUtil.isRunning()) {
+				if (ShizukuUtil.isReady()) {
+					_ShizukuAutoInject(s, FileUtil.getExternalStorageDir().concat("/Android/data/com.mobile.legends/files/dragon2017/"));
+				}
+				else {
+					if (ShizukuUtil.checkPermission(MainActivity.this, 100)) {
+
+					}
+				}
+			}
+			else {
+				SketchwareUtil.showMessage(getApplicationContext(), "Choose Other Options or Run your Shizuku!");
+				i.setClass(getApplicationContext(), PermissionActivity.class);
+				startActivity(i);
+			}
+
+			return;
+		}
+
+		if (!s.equals("")) {
+
+			if (ODialog != null) {
+				ODialog.dismiss();
+			}
+
+			SketchwareUtil.showMessage(getApplicationContext(), s);
+			return;
+		}
+
+		textview5.setText("Downloaded");
+
+		files = filename;
+
+		Decompress d = new Decompress(
+			path1,
+			path,
+			MainActivity.this,
+			ODialog,
+			progressbar2,
+			process_files,
+			process_percent,
+			process_seconds
+		);
+
+		d.execute();
+	}
+}
+
+
+private class Decompress extends AsyncTask<Void, Integer, Integer> {
+
+	DocumentFile srcZipFile;
+	DocumentFile destDir;
+	Context ctx;
+
+	AlertDialog ODialog;
+	ProgressBar progressbar2;
+
+	TextView process_files;
+	TextView process_percent;
+	TextView process_seconds;
+
+	int result = 0;
+	int totalFiles = 0;
+	int processedFiles = 0;
+	long extractStartTime = 0;
+
+	public Decompress(
+		DocumentFile srcZipFile,
+		DocumentFile destDir,
+		Context ctx,
+		AlertDialog ODialog,
+		ProgressBar progressbar2,
+		TextView process_files,
+		TextView process_percent,
+		TextView process_seconds
+	) {
+		super();
+		this.srcZipFile = srcZipFile;
+		this.destDir = destDir;
+		this.ctx = ctx;
+		this.ODialog = ODialog;
+		this.progressbar2 = progressbar2;
+		this.process_files = process_files;
+		this.process_percent = process_percent;
+		this.process_seconds = process_seconds;
+	}
+
+	@Override
+	protected void onPreExecute() {
+		super.onPreExecute();
+
+		progressbar2.setMax(100);
+		progressbar2.setProgress(0);
+		progressbar2.setIndeterminate(false);
+
+		process_files.setText("Counting files...");
+		process_percent.setText("0%");
+		process_seconds.setText("Preparing...");
+	}
+
+	@Override
+	protected Integer doInBackground(Void... params) {
+
+		try {
+
+			totalFiles = countZipFiles();
+
+			extractStartTime = System.currentTimeMillis();
+
+			ZipEntry entry;
+			InputStream inputStream = getContentResolver().openInputStream(srcZipFile.getUri());
+			BufferedInputStream bis = new BufferedInputStream(inputStream);
+			java.util.zip.ZipInputStream zipInputStream = new java.util.zip.ZipInputStream(bis);
+
+			while ((entry = zipInputStream.getNextEntry()) != null) {
+
+				DocumentFile parentDir = destDir;
+				DocumentFile childDir = null;
+
+				processedFiles++;
+				publishProgress(processedFiles);
+
+				if (entry.toString().endsWith("/")) {
+
+					String[] tempStr = entry.toString().split("/");
+
+					for (String st : tempStr) {
+
+						if (st.equals("UI")) {
+							childDir = parentDir.findFile(st.toUpperCase());
+
+							if (childDir == null) {
+								childDir = parentDir.createDirectory(st);
+							}
+
+						} else {
+
+							childDir = parentDir.findFile(st);
+
+							if (childDir == null) {
+								childDir = parentDir.createDirectory(st);
+							}
+						}
+
+						parentDir = childDir;
+					}
+				}
+				else if (entry.toString().contains("/")) {
+
+					String[] tempStr = entry.toString().split("/");
+
+					for (int i = 0; i < tempStr.length - 1; i++) {
+
+						childDir = parentDir.findFile(tempStr[i]);
+
+						if (childDir == null) {
+							childDir = parentDir.createDirectory(tempStr[i]);
+						}
+
+						parentDir = childDir;
+					}
+
+					unzipFile(entry, zipInputStream, parentDir);
+				}
+				else if (entry.toString().equals("/")) {
+
+				}
+				else {
+
+					unzipFile(entry, zipInputStream, destDir);
+				}
+			}
+
+			zipInputStream.close();
+			inputStream.close();
+
+		} catch (IOException e1) {
+
+			final String e11 = e1.toString();
+
+			runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+					SketchwareUtil.showMessage(getApplicationContext(), e11);
+				}
+			});
+		}
+
+		return result;
+	}
+
+	private int countZipFiles() {
+
+		int count = 0;
+
+		try {
+
+			InputStream inputStream = getContentResolver().openInputStream(srcZipFile.getUri());
+			BufferedInputStream bis = new BufferedInputStream(inputStream);
+			java.util.zip.ZipInputStream zipInputStream = new java.util.zip.ZipInputStream(bis);
+
+			ZipEntry entry;
+
+			while ((entry = zipInputStream.getNextEntry()) != null) {
+				count++;
+			}
+
+			zipInputStream.close();
+			inputStream.close();
+
+		} catch (Exception e) {
+
+		}
+
+		return count;
+	}
+
+	private void unzipFile(
+		ZipEntry fileEntry,
+		java.util.zip.ZipInputStream zipInputStream,
+		DocumentFile finalDir
+	) throws IOException {
+
+		if (!fileEntry.isDirectory()) {
+
+			DocumentFile tempFile = null;
+			DocumentFile df = null;
+			DocumentFile dff = finalDir;
+
+			tempFile = DocumentFile.fromSingleUri(
+				MainActivity.this,
+				Uri.parse(finalDir.getUri().toString().concat(Uri.encode("/").concat(Uri.parse(fileEntry.toString()).getLastPathSegment())))
+			);
+
+			if (tempFile.exists()) {
+
+				df = tempFile;
+
+			} else {
+
+				df = dff.createFile("*/*", Uri.parse(fileEntry.toString()).getLastPathSegment());
+			}
+
+			try {
+
+				OutputStream out = getContentResolver().openOutputStream(df.getUri());
+				BufferedOutputStream bos = new BufferedOutputStream(out);
+
+				byte[] buffer = new byte[4096];
+				int count = -1;
+
+				while ((count = zipInputStream.read(buffer)) != -1) {
+					out.write(buffer, 0, count);
+				}
+
+				out.close();
+				bos.close();
+
+			} catch (Exception e2) {
+
+				final String e22 = e2.toString();
+
+				runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						SketchwareUtil.showMessage(getApplicationContext(), e22);
+					}
+				});
+			}
+		}
+	}
+
+	@Override
+	protected void onProgressUpdate(Integer... progress) {
+		super.onProgressUpdate(progress);
+
+		int current = progress[progress.length - 1];
+		int percent = 0;
+
+		if (totalFiles > 0) {
+			percent = (int)((current * 100) / totalFiles);
+		}
+
+		progressbar2.setProgress(percent);
+		process_files.setText(current + " / " + totalFiles + " files processed");
+		process_percent.setText(percent + "%");
+
+		long elapsed = (System.currentTimeMillis() - extractStartTime) / 1000;
+		process_seconds.setText(elapsed + " seconds");
+	}
+
+	@Override
+	protected void onPostExecute(Integer result) {
+		super.onPostExecute(result);
+
+		progressbar2.setProgress(100);
+		process_percent.setText("100%");
+
+		if (ODialog != null) {
+			ODialog.dismiss();
+		}
+
+		try {
+
+			DocumentsContract.deleteDocument(
+				getApplicationContext().getContentResolver(),
+				srcZipFile.getUri()
+			);
+
+			TastyToast.makeText(
+				MainActivity.this,
+				"Download Completed!",
+				TastyToast.LENGTH_LONG,
+				TastyToast.SUCCESS
+			);
+
+		} catch (FileNotFoundException e) {
+
+			TastyToast.makeText(
+				MainActivity.this,
+				"Error",
+				TastyToast.LENGTH_LONG,
+				TastyToast.ERROR
+			);
+		}
+	}
+
+
+
+
